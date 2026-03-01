@@ -3,10 +3,12 @@ import random
 import time
 from datetime import datetime
 from kafka import KafkaProducer
+import os
+broker = os.getenv('KAFKA_BROKER', 'redpanda:9092')
 
 # Configuration du producteur
 producer = KafkaProducer(
-    bootstrap_servers=['localhost:9092'],
+    bootstrap_servers=[broker], # <-- On utilise l'adresse interne au réseau Docker
     value_serializer=lambda v: json.dumps(v).encode('utf-8')
 )
 
