@@ -22,6 +22,7 @@ Mise en place un pipeline de données pour ingérer, traiter et analyser ces tic
 
 ## Architecture du Pipeline
 
+```mermaid
 graph LR
     subgraph Sources
         A[Générateur Python] -->|JSON| B(Redpanda Topic: client_tickets)
@@ -37,3 +38,4 @@ graph LR
         D -->|Write| F[(Parquet Files)]
         E -->|Output| G[Console/Visualisation]
     end
+```
