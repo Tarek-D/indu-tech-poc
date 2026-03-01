@@ -9,7 +9,6 @@ spark = SparkSession.builder \
     .config("spark.jars.packages", "org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0") \
     .config("spark.executor.memory", "2g") \
     .config("spark.sql.shuffle.partitions", "4") \
-    .get_name() \
     .getOrCreate()
 
 # 2. Définition du schéma des données entrantes (doit matcher le producteur)
@@ -25,9 +24,9 @@ schema = StructType([
 # 3. Lecture du flux Redpanda
 df_raw = spark.readStream \
     .format("kafka") \
-    .option("kafka.bootstrap.servers", "localhost:9092") \
+    .option("kafka.bootstrap.servers", "redpanda:9092") \
     .option("subscribe", "client_tickets") \
-    .option("startingOffsets", "latest") \
+    .option("startingOffsets", "earliest") \
     .option("failOnDataLoss", "false") \
     .load()
 
@@ -49,28 +48,27 @@ df_transformed = df_json.withColumn("equipe_assignee",
 df_insights = df_transformed.groupBy("type_demande").count()
 
 # 5. Affichage des résultats dans la console (POC)
-# Utilisation du mode "complete" pour l'agrégation
 query_insights = df_insights.writeStream \
     .outputMode("complete") \
     .format("console") \
+    .trigger(processingTime='5 seconds') \
     .start()
 
-# Affichage des tickets transformés (mode "append")
+# Affichage des tickets transformés
 query_transformed = df_transformed.writeStream \
     .outputMode("append") \
     .format("console") \
+    .trigger(processingTime='5 seconds') \
     .start()
-
-query_insights.awaitTermination()
 
 # 6. Exportation des données transformées vers le format Parquet
-# On utilise un "checkpoint" pour la résilience (indispensable en streaming)
 query_export = df_transformed.writeStream \
     .format("parquet") \
-    .option("path", "./export/tickets_processed") \
-    .option("checkpointLocation", "./checkpoints/tickets") \
+    .option("path", "/app/export/tickets_processed") \
+    .option("checkpointLocation", "/app/checkpoints/tickets") \
     .outputMode("append") \
+    .trigger(processingTime='10 seconds') \
     .start()
 
-# Maintenir le script en éveil pour traiter le flux
-query_export.awaitTermination()
+# ON ATTEND LA FIN DE TOUTES LES REQUÊTES ICI (À LA FIN)
+spark.streams.awaitAnyTermination()
