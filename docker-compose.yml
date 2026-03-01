@@ -1,0 +1,34 @@
+services:
+  # 1. Redpanda (Broker)
+  redpanda:
+    image: docker.redpanda.com/redpandadata/redpanda:v23.2.1
+    container_name: redpanda-poc
+    command:
+      - redpanda start
+      - --smp 1
+      - --overprovisioned
+      - --kafka-addr PLAINTEXT://0.0.0.0:29092,OUTSIDE://0.0.0.0:9092
+      - --advertise-kafka-addr PLAINTEXT://redpanda:29092,OUTSIDE://redpanda:9092
+    ports:
+      - "9092:9092"
+
+  # 2. Producteur de tickets
+  ticket-producer:
+    build: ./producer
+    container_name: ticket-producer
+    depends_on:
+      - redpanda
+    environment:
+      - KAFKA_BROKER=redpanda:9092
+
+  # 3. Traitement Spark
+  spark-processor:
+    build: ./spark
+    container_name: spark-processor
+    depends_on:
+      - redpanda
+    volumes:
+      - ./export:/app/export  # Volume pour récupérer les fichiers Parquet
+    command: >
+      spark-submit --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0 
+      ticket_processor.py
